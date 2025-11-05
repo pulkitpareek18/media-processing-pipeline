@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Processing Pipeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f8f9ff;
+        }
+
+        .upload-area.drag-over {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .file-info {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s ease;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .jobs-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .job-card {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .job-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .job-title {
+            font-weight: 600;
+            color: #333;
+            flex-grow: 1;
+        }
+
+        .job-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-uploaded { background: #e3f2fd; color: #1976d2; }
+        .status-processing { background: #fff3e0; color: #f57c00; }
+        .status-completed { background: #e8f5e8; color: #388e3c; }
+        .status-failed { background: #ffebee; color: #d32f2f; }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+        }
+
+        .progress-completed {
+            background: #28a745;
+        }
+
+        .progress-failed {
+            background: #dc3545;
+        }
+
+        .job-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .job-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .download-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .download-link {
+            background: #28a745;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.8em;
+            transition: background 0.3s ease;
+        }
+
+        .download-link:hover {
+            background: #1e7e34;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #d32f2f;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-style: italic;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success { background: #28a745; }
+        .notification.error { background: #dc3545; }
+        .notification.info { background: #007bff; }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .upload-section, .jobs-section {
+                padding: 20px;
+            }
+            
+            .job-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            .job-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 Video Processing Pipeline</h1>
+            <p>Upload videos and automatically generate multiple quality versions</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📹</div>
+                <div class="upload-text">Drop your video file here or click to browse</div>
+                <div class="file-info">Supports MP4, AVI, MOV, MKV files up to 500MB</div>
+                <input type="file" id="fileInput" class="file-input" accept="video/*">
+            </div>
+            <div id="selectedFile" style="display: none; margin-top: 20px;">
+                <div id="fileDetails"></div>
+                <button id="uploadBtn" class="btn" disabled>Upload Video</button>
+            </div>
+        </div>
+
+        <div class="jobs-section">
+            <h2>Processing Jobs</h2>
+            <div id="jobsList">
+                <div class="empty-state">No jobs yet. Upload a video to get started!</div>
+            </div>
+            <button id="refreshBtn" class="btn" style="margin-top: 20px;">🔄 Refresh Jobs</button>
+        </div>
+    </div>
+
+    <script>
+        class VideoProcessor {
+            constructor() {
+                this.selectedFile = null;
+                this.jobs = [];
+                this.init();
+                this.loadJobs();
+                this.startAutoRefresh();
+            }
+
+            init() {
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('fileInput');
+                const uploadBtn = document.getElementById('uploadBtn');
+                const refreshBtn = document.getElementById('refreshBtn');
+
+                // Upload area click
+                uploadArea.addEventListener('click', () => fileInput.click());
+
+                // File input change
+                fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0]));
+
+                // Drag and drop
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('drag-over');
+                });
+
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('drag-over');
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('drag-over');
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('video/')) {
+                        this.handleFileSelect(file);
+                    } else {
+                        this.showNotification('Please select a valid video file', 'error');
+                    }
+                });
+
+                // Upload button
+                uploadBtn.addEventListener('click', () => this.uploadFile());
+
+                // Refresh button
+                refreshBtn.addEventListener('click', () => this.loadJobs());
+            }
+
+            handleFileSelect(file) {
+                if (!file) return;
+
+                if (!file.type.startsWith('video/')) {
+                    this.showNotification('Please select a valid video file', 'error');
+                    return;
+                }
+
+                if (file.size > 500 * 1024 * 1024) {
+                    this.showNotification('File size must be less than 500MB', 'error');
+                    return;
+                }
+
+                this.selectedFile = file;
+                this.updateFileDisplay();
+            }
+
+            updateFileDisplay() {
+                const selectedFileDiv = document.getElementById('selectedFile');
+                const fileDetails = document.getElementById('fileDetails');
+                const uploadBtn = document.getElementById('uploadBtn');
+
+                if (this.selectedFile) {
+                    const sizeInMB = (this.selectedFile.size / (1024 * 1024)).toFixed(2);
+                    fileDetails.innerHTML = `
+                        <strong>Selected:</strong> ${this.selectedFile.name}<br>
+                        <strong>Size:</strong> ${sizeInMB} MB<br>
+                        <strong>Type:</strong> ${this.selectedFile.type}
+                    `;
+                    selectedFileDiv.style.display = 'block';
+                    uploadBtn.disabled = false;
+                } else {
+                    selectedFileDiv.style.display = 'none';
+                }
+            }
+
+            async uploadFile() {
+                if (!this.selectedFile) return;
+
+                const uploadBtn = document.getElementById('uploadBtn');
+                const originalText = uploadBtn.textContent;
+                
+                try {
+                    uploadBtn.disabled = true;
+                    uploadBtn.innerHTML = '<span class="loading"></span> Uploading...';
+
+                    const formData = new FormData();
+                    formData.append('video', this.selectedFile);
+
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        this.showNotification('Video uploaded successfully!', 'success');
+                        this.selectedFile = null;
+                        this.updateFileDisplay();
+                        this.loadJobs();
+                        
+                        // Auto-start processing
+                        setTimeout(() => this.startProcessing(result.jobId), 1000);
+                    } else {
+                        throw new Error(result.error || 'Upload failed');
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    this.showNotification(error.message, 'error');
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = originalText;
+                }
+            }
+
+            async startProcessing(jobId) {
+                try {
+                    const response = await fetch(`/api/process/${jobId}`, { method: 'POST' });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        this.showNotification('Processing started!', 'info');
+                        this.loadJobs();
+                    } else {
+                        throw new Error(result.error || 'Failed to start processing');
+                    }
+                } catch (error) {
+                    console.error('Processing error:', error);
+                    this.showNotification(error.message, 'error');
+                }
+            }
+
+            async loadJobs() {
+                try {
+                    const response = await fetch('/api/jobs');
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        this.jobs = result.jobs;
+                        this.renderJobs();
+                    } else {
+                        throw new Error('Failed to load jobs');
+                    }
+                } catch (error) {
+                    console.error('Load jobs error:', error);
+                    this.showNotification('Failed to load jobs', 'error');
+                }
+            }
+
+            renderJobs() {
+                const jobsList = document.getElementById('jobsList');
+                
+                if (this.jobs.length === 0) {
+                    jobsList.innerHTML = '<div class="empty-state">No jobs yet. Upload a video to get started!</div>';
+                    return;
+                }
+
+                jobsList.innerHTML = this.jobs.map(job => this.renderJob(job)).join('');
+            }
+
+            renderJob(job) {
+                const progressClass = job.status === 'completed' ? 'progress-completed' : 
+                                    job.status === 'failed' ? 'progress-failed' : '';
+
+                return `
+                    <div class="job-card">
+                        <div class="job-header">
+                            <div class="job-title">${job.filename}</div>
+                            <div class="job-status status-${job.status}">${job.status}</div>
+                        </div>
+                        
+                        <div class="progress-bar">
+                            <div class="progress-fill ${progressClass}" style="width: ${job.progress}%"></div>
+                        </div>
+                        
+                        <div class="job-details">
+                            <div><strong>Progress:</strong> ${job.progress}%</div>
+                            <div><strong>Status:</strong> ${job.message}</div>
+                            <div><strong>Uploaded:</strong> ${new Date(job.uploadedAt).toLocaleString()}</div>
+                        </div>
+                        
+                        <div class="job-actions">
+                            ${job.status === 'uploaded' ? 
+                                `<button class="btn" onclick="app.startProcessing('${job.jobId}')">Start Processing</button>` : 
+                                ''
+                            }
+                            ${job.status === 'completed' ? 
+                                `<button class="btn btn-success" onclick="app.showDownloads('${job.jobId}')">View Downloads</button>` : 
+                                ''
+                            }
+                            <button class="btn" onclick="app.viewJobDetails('${job.jobId}')">View Details</button>
+                            <button class="btn btn-danger" onclick="app.deleteJob('${job.jobId}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async viewJobDetails(jobId) {
+                try {
+                    const response = await fetch(`/api/status/${jobId}`);
+                    const job = await response.json();
+                    
+                    if (response.ok) {
+                        let details = `Job ID: ${job.jobId}\n`;
+                        details += `Filename: ${job.filename}\n`;
+                        details += `Status: ${job.status}\n`;
+                        details += `Progress: ${job.progress}%\n`;
+                        details += `Message: ${job.message}\n`;
+                        details += `Uploaded: ${new Date(job.uploadedAt).toLocaleString()}\n`;
+                        
+                        if (job.startedAt) {
+                            details += `Started: ${new Date(job.startedAt).toLocaleString()}\n`;
+                        }
+                        
+                        if (job.completedAt) {
+                            details += `Completed: ${new Date(job.completedAt).toLocaleString()}\n`;
+                        }
+                        
+                        if (job.error) {
+                            details += `Error: ${job.error}\n`;
+                        }
+                        
+                        if (job.processedFiles && job.processedFiles.length > 0) {
+                            details += `\nProcessed Files:\n`;
+                            job.processedFiles.forEach(f => {
+                                details += `- ${f.filename} (${f.quality})\n`;
+                            });
+                        }
+                        
+                        alert(details);
+                    }
+                } catch (error) {
+                    this.showNotification('Failed to load job details', 'error');
+                }
+            }
+
+            async showDownloads(jobId) {
+                try {
+                    const response = await fetch(`/api/status/${jobId}`);
+                    const job = await response.json();
+                    
+                    if (response.ok && job.processedFiles) {
+                        let downloadList = 'Available Downloads:\n\n';
+                        job.processedFiles.forEach(f => {
+                            downloadList += `${f.quality}: /api/download/${jobId}/${f.quality.replace('p', '')}\n`;
+                        });
+                        downloadList += `\nAll files: /api/download/${jobId}`;
+                        
+                        if (confirm(downloadList + '\n\nOpen download links?')) {
+                            job.processedFiles.forEach(f => {
+                                const quality = f.quality.replace('p', '');
+                                window.open(`/api/download/${jobId}/${quality}`, '_blank');
+                            });
+                        }
+                    }
+                } catch (error) {
+                    this.showNotification('Failed to load downloads', 'error');
+                }
+            }
+
+            async deleteJob(jobId) {
+                if (!confirm('Are you sure you want to delete this job? This will remove all associated files.')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/jobs/${jobId}`, { method: 'DELETE' });
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        this.showNotification('Job deleted successfully', 'success');
+                        this.loadJobs();
+                    } else {
+                        throw new Error(result.error || 'Failed to delete job');
+                    }
+                } catch (error) {
+                    this.showNotification(error.message, 'error');
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 4000);
+            }
+
+            startAutoRefresh() {
+                setInterval(() => {
+                    // Only refresh if there are processing jobs
+                    if (this.jobs.some(job => job.status === 'processing')) {
+                        this.loadJobs();
+                    }
+                }, 3000); // Refresh every 3 seconds
+            }
+        }
+
+        // Initialize the app
+        const app = new VideoProcessor();
+    </script>
+</body>
+</html>

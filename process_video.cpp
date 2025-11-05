@@ -1,30 +1,67 @@
 #include <iostream>
-#include <filesystem>
 #include <string>
 #include <vector>
 #include <map>
 #include <sstream>
 #include <cstdlib>
+#include <cstdio>
 #include <chrono>
 #include <iomanip>
+#include <fstream>
 
-namespace fs = std::filesystem;
+// Windows/POSIX compatibility
+#ifdef _WIN32
+    #include <direct.h>
+    #include <io.h>
+    #define mkdir(path, mode) _mkdir(path)
+    #define access(path, mode) _access(path, mode)
+    #define F_OK 0
+#else
+    #include <unistd.h>
+    #include <sys/stat.h>
+#endif
 
 // Get video height using ffprobe
 int getVideoHeight(const std::string& videoPath) {
+    std::string tempFile = "temp_height.txt";
     std::string cmd = "ffprobe -v error -select_streams v:0 -show_entries stream=height "
-                      "-of default=noprint_wrappers=1:nokey=1 \"" + videoPath + "\"";
-    FILE* pipe = _popen(cmd.c_str(), "r");
-    if (!pipe) return -1;
-    char buffer[128];
-    std::string result;
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        result += buffer;
+                      "-of default=noprint_wrappers=1:nokey=1 \"" + videoPath + "\" > " + tempFile;
+    
+    int result = system(cmd.c_str());
+    if (result != 0) {
+        std::cerr << "Error: Failed to execute ffprobe. Is it installed and in your PATH?" << std::endl;
+        return -1;
     }
-    _pclose(pipe);
+    
+    std::ifstream file(tempFile);
+    if (!file) {
+        std::cerr << "Error: Could not read ffprobe output file." << std::endl;
+        return -1;
+    }
+    
+    std::string heightStr;
+    std::getline(file, heightStr);
+    file.close();
+    
+    // Clean up temp file
+    remove(tempFile.c_str());
+
+    // Trim whitespace which can cause stoi to fail
+    size_t first = heightStr.find_first_not_of(" \t\n\r");
+    if (std::string::npos == first) {
+        std::cerr << "Error: ffprobe returned empty output for video height." << std::endl;
+        return -1;
+    }
+    size_t last = heightStr.find_last_not_of(" \t\n\r");
+    std::string trimmed_result = heightStr.substr(first, (last - first + 1));
+
     try {
-        return std::stoi(result);
-    } catch (...) {
+        return std::stoi(trimmed_result);
+    } catch (const std::invalid_argument& e) {
+        std::cerr << "Error: Could not parse video height from ffprobe output: '" << trimmed_result << "'. " << e.what() << std::endl;
+        return -1;
+    } catch (const std::out_of_range& e) {
+        std::cerr << "Error: Video height value from ffprobe is out of range: '" << trimmed_result << "'. " << e.what() << std::endl;
         return -1;
     }
 }
@@ -54,16 +91,46 @@ std::vector<std::pair<std::string, int>> getSubordinateQualities(int inputHeight
     return subordinateQualities;
 }
 
+// Helper function to extract filename without extension
+std::string getFilenameStem(const std::string& path) {
+    size_t lastSlash = path.find_last_of("/\\");
+    size_t start = (lastSlash == std::string::npos) ? 0 : lastSlash + 1;
+    size_t lastDot = path.find_last_of('.');
+    size_t end = (lastDot == std::string::npos || lastDot < start) ? path.length() : lastDot;
+    return path.substr(start, end - start);
+}
+
+// Helper function to copy file
+bool copyFile(const std::string& src, const std::string& dst) {
+    std::ifstream source(src, std::ios::binary);
+    std::ofstream dest(dst, std::ios::binary);
+    
+    if (!source || !dest) {
+        return false;
+    }
+    
+    dest << source.rdbuf();
+    return source.good() && dest.good();
+}
+
+// Helper function to check if directory exists
+bool directoryExists(const std::string& path) {
+    return access(path.c_str(), F_OK) == 0;
+}
+
 void processVideo(const std::string& videoPath) {
     auto start_time = std::chrono::high_resolution_clock::now();
     
-    fs::path inputPath(videoPath);
-    std::string stem = inputPath.stem().string();
+    std::string stem = getFilenameStem(videoPath);
     std::string folderName = stem;
 
     // Create output folder
-    fs::create_directory(folderName);
-
+    if (!directoryExists(folderName)) {
+        if (mkdir(folderName.c_str(), 0755) != 0) {
+            std::cerr << "Error: Failed to create directory '" << folderName << "'" << std::endl;
+            return;
+        }
+    }
     // Get input video height
     int inputHeight = getVideoHeight(videoPath);
     if (inputHeight == -1) {
@@ -75,7 +142,10 @@ void processVideo(const std::string& videoPath) {
     
     // Copy original video with height in filename
     std::string originalOut = folderName + "/" + stem + " " + std::to_string(inputHeight) + ".mp4";
-    fs::copy_file(videoPath, originalOut, fs::copy_options::overwrite_existing);
+    if (!copyFile(videoPath, originalOut)) {
+        std::cerr << "Error: Failed to copy original video to '" << originalOut << "'" << std::endl;
+        return;
+    }
     std::cout << "Original copied as: " << originalOut << std::endl;
 
     // Get subordinate qualities
@@ -103,6 +173,7 @@ void processVideo(const std::string& videoPath) {
             std::cout << "✓ " << q.first << "p completed" << std::endl;
         } else {
             std::cout << "✗ " << q.first << "p failed" << std::endl;
+            std::cerr << "✗ " << q.first << "p failed. Command was: " << cmd << std::endl;
         }
     }
 
@@ -121,7 +192,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    if (!fs::exists(argv[1])) {
+    if (access(argv[1], F_OK) != 0) {
         std::cerr << "Error: File does not exist: " << argv[1] << std::endl;
         return 1;
     }
