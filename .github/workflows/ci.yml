@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  c-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build C implementation
+        run: cc -Wall -Wextra process_video.c -o process_video_ci
+
+      - name: Validate usage output
+        run: |
+          ./process_video_ci > usage.txt 2>&1 || true
+          grep -q "Usage:" usage.txt
+
+  cpp-syntax:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: C++ syntax check
+        run: g++ -std=c++17 -fsyntax-only -D_popen=popen -D_pclose=pclose process_video.cpp

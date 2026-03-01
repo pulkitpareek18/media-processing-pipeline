@@ -1,5 +1,17 @@
 # Media Processing Pipeline
 
+[![CI](https://github.com/pulkitpareek18/media-processing-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/pulkitpareek18/media-processing-pipeline/actions/workflows/ci.yml)
+![Last Commit](https://img.shields.io/github/last-commit/pulkitpareek18/media-processing-pipeline)
+![Stars](https://img.shields.io/github/stars/pulkitpareek18/media-processing-pipeline)
+![Language](https://img.shields.io/badge/Languages-C%20%7C%20C%2B%2B-blue)
+
+## Release Snapshot (March 2026)
+
+- Status: Active
+- Type: CLI video processing utility
+- Core tooling: `ffprobe` + `ffmpeg`
+- CI checks: C build + C++ syntax check
+
 CLI utility to generate lower-resolution variants from a single source video using `ffprobe` + `ffmpeg`.
 
 ## What It Does
