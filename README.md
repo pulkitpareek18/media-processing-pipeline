@@ -12,6 +12,10 @@
 - Core tooling: `ffprobe` + `ffmpeg`
 - CI checks: C build + C++ syntax check
 
+## Demo Card
+
+[![Media Processing Pipeline Demo Card](https://opengraph.githubassets.com/1/pulkitpareek18/media-processing-pipeline)](https://github.com/pulkitpareek18/media-processing-pipeline/blob/main/video.mp4)
+
 CLI utility to generate lower-resolution variants from a single source video using `ffprobe` + `ffmpeg`.
 
 ## What It Does
